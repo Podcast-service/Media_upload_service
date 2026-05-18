@@ -15,7 +15,6 @@ tracing-subscriber = "0.3"
 uuid = { version = "1", features = ["v4", "serde"] }
 anyhow = "1.0"
 utoipa = { version = "4", features = ["axum_extras", "uuid", "chrono"] }
-utoipa-swagger-ui = { version = "7", features = ["axum"] }
 tempfile = "3"
 rdkafka = { version = "0.39.0", features = ["cmake-build"] }
 chrono = { version = "0.4", features = ["serde"] }

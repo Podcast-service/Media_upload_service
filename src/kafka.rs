@@ -1,43 +1,39 @@
 use anyhow::{Context, Result};
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord, Producer};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
-use uuid::Uuid;
 use utoipa::ToSchema;
-
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MediaStartUploadEvent {
-    pub file_id: String,
-    pub author_id: String,
-    pub filename: String,
-    pub started_at: String,
-}
+use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MediaUploadedEvent {
-    pub file_id: String,
-    pub author_id: String,
-    pub size_bytes: usize,
-    pub original_format: String,
-    pub temp_path: String,
-    pub uploaded_at: String,
+#[serde(tag = "event", rename_all = "snake_case")]
+pub enum MediaEvent {
+    StartUpload {
+        file_id: String,
+        author_id: String,
+        filename: String,
+        started_at: DateTime<Utc>,
+    },
+    Uploaded {
+        file_id: String,
+        author_id: String,
+        size_bytes: usize,
+        original_format: String,
+        temp_path: String,
+        uploaded_at: DateTime<Utc>,
+    },
+    Error {
+        file_id: String,
+        stage: String,
+        error_message: String,
+        timestamp: DateTime<Utc>,
+    },
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct MediaErrorEvent {
-    pub file_id: String,
-    pub stage: String,
-    pub error_message: String,
-    pub timestamp: String,
-}
-
 
 const TOPIC: &str = "media";
-
 
 pub struct KafkaProducer {
     producer: FutureProducer,
@@ -48,6 +44,11 @@ impl KafkaProducer {
         let producer = ClientConfig::new()
             .set("bootstrap.servers", brokers)
             .set("message.timeout.ms", "5000")
+            .set("message.send.max.retries", "10")
+            .set("retry.backoff.ms", "500")
+            .set("reconnect.backoff.ms", "500")
+            .set("reconnect.backoff.max.ms", "10000")
+            .set("socket.keepalive.enable", "true")
             .create::<FutureProducer>()
             .context("Failed to create Kafka producer")?;
 
@@ -60,17 +61,16 @@ impl KafkaProducer {
         author_id: &str,
         filename: &str,
     ) -> Result<()> {
-        let event = MediaStartUploadEvent {
-            file_id: file_id.to_string(),
+        let file_id_key = file_id.to_string();
+        let event = MediaEvent::StartUpload {
+            file_id: file_id_key.clone(),
             author_id: author_id.to_string(),
             filename: filename.to_string(),
-            started_at: Utc::now().to_rfc3339(),
+            started_at: Utc::now(),
         };
 
         let payload = serde_json::to_string(&event)?;
-        let record = FutureRecord::to(TOPIC)
-            .key(&event.file_id)
-            .payload(&payload);
+        let record = FutureRecord::to(TOPIC).key(&file_id_key).payload(&payload);
 
         self.producer
             .send(record, Duration::from_secs(30))
@@ -94,19 +94,18 @@ impl KafkaProducer {
         original_format: &str,
         temp_path: &str,
     ) -> Result<()> {
-        let event = MediaUploadedEvent {
-            file_id: file_id.to_string(),
+        let file_id_key = file_id.to_string();
+        let event = MediaEvent::Uploaded {
+            file_id: file_id_key.clone(),
             author_id: author_id.to_string(),
             size_bytes,
             original_format: original_format.to_string(),
             temp_path: temp_path.to_string(),
-            uploaded_at: Utc::now().to_rfc3339(),
+            uploaded_at: Utc::now(),
         };
 
         let payload = serde_json::to_string(&event)?;
-        let record = FutureRecord::to(TOPIC)
-            .key(&event.file_id)
-            .payload(&payload);
+        let record = FutureRecord::to(TOPIC).key(&file_id_key).payload(&payload);
 
         self.producer
             .send(record, Duration::from_secs(30))
@@ -122,23 +121,17 @@ impl KafkaProducer {
         Ok(())
     }
 
-    pub async fn send_error(
-        &self,
-        file_id: Uuid,
-        stage: &str,
-        error_message: &str,
-    ) -> Result<()> {
-        let event = MediaErrorEvent {
-            file_id: file_id.to_string(),
+    pub async fn send_error(&self, file_id: Uuid, stage: &str, error_message: &str) -> Result<()> {
+        let file_id_key = file_id.to_string();
+        let event = MediaEvent::Error {
+            file_id: file_id_key.clone(),
             stage: stage.to_string(),
             error_message: error_message.to_string(),
-            timestamp: Utc::now().to_rfc3339(),
+            timestamp: Utc::now(),
         };
 
         let payload = serde_json::to_string(&event)?;
-        let record = FutureRecord::to(TOPIC)
-            .key(&event.file_id)
-            .payload(&payload);
+        let record = FutureRecord::to(TOPIC).key(&file_id_key).payload(&payload);
 
         self.producer
             .send(record, Duration::from_secs(30))

@@ -6,13 +6,12 @@ mod validation;
 
 use axum::{
     extract::DefaultBodyLimit,
-    routing::post,
-    Router,
+    routing::{get, post},
+    Json, Router,
 };
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 use utoipa::OpenApi;
-use utoipa_swagger_ui::SwaggerUi;
 
 use api_doc::ApiDoc;
 
@@ -44,7 +43,7 @@ async fn main() {
         .allow_headers(Any);
 
     let app = Router::new()
-        .merge(SwaggerUi::new("/swagger-ui").url("/api-docs/openapi.json", ApiDoc::openapi()))
+        .route("/api-docs/openapi.json", get(openapi_json))
         .route("/api/media/upload", post(upload::upload_media))
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .layer(cors)
@@ -58,11 +57,14 @@ async fn main() {
         .expect("Failed to bind");
 
     info!("media_api listening on http://{}", addr);
-    info!("Swagger UI: http://localhost:{}/swagger-ui/", port);
     info!(
         "OpenAPI JSON: http://localhost:{}/api-docs/openapi.json",
         port
     );
 
     axum::serve(listener, app).await.expect("Server error");
+}
+
+async fn openapi_json() -> Json<utoipa::openapi::OpenApi> {
+    Json(ApiDoc::openapi())
 }

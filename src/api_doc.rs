@@ -1,7 +1,7 @@
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
-use crate::kafka::{MediaErrorEvent, MediaStartUploadEvent, MediaUploadedEvent};
+use crate::kafka::MediaEvent;
 use crate::upload::{UploadRequest, UploadResponse};
 
 struct SecurityAddon;
@@ -31,9 +31,7 @@ impl Modify for SecurityAddon {
         schemas(
             UploadRequest,
             UploadResponse,
-            MediaStartUploadEvent,
-            MediaUploadedEvent,
-            MediaErrorEvent,
+            MediaEvent,
         )
     ),
     modifiers(&SecurityAddon),
