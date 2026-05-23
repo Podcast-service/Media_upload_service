@@ -13,7 +13,7 @@
 
 Код `Media_worker` и `Media_subtitle_worker` не нужен для сборки API. Связь с остальными сервисами идёт через Kafka topic `media` и общий volume с `TEMP_UPLOAD_DIR`, если downstream worker должен читать файл по `temp_path`.
 
-## Что нужноs
+## Что нужно
 
 - Docker Desktop / Docker Engine с `docker compose`
 - свободные порты `8081` и `9092`
