@@ -42,14 +42,6 @@ services:
         kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic media.subtitle --partitions 1 --replication-factor 1;
         kafka-topics --bootstrap-server kafka:9092 --list;
 
-  rustfs:
-    image: rustfs/rustfs:latest
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - rustfs_data:/data
-
   media-api:
     build:
       context: .
@@ -64,10 +56,13 @@ services:
     environment:
       KAFKA_BROKERS: kafka:9092
       JWT_SECRET: super-secret-key-change-me
-      TEMP_UPLOAD_DIR: /tmp/media_uploads
       PORT: 8081
-    volumes:
-      - media_tmp:/tmp/media_uploads
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-https://s3.twcstorage.ru}
+      S3_BUCKET: ${S3_BUCKET:-4c5face5-544c-4bc2-a2e0-57a24d243af3}
+      AUDIO_BUCKET: ${AUDIO_BUCKET:-4c5face5-544c-4bc2-a2e0-57a24d243af3}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+      S3_REGION: ${S3_REGION:-ru-1}
 
   media-worker:
     build:
@@ -78,36 +73,41 @@ services:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-      rustfs:
-        condition: service_started
     ports:
       - "8082:8082"
     environment:
       KAFKA_BROKERS: kafka:9092
       PORT: 8082
-      RUSTFS_REGION: us-east-1
-      RUSTFS_ACCESS_KEY_ID: rustfsadmin
-      RUSTFS_SECRET_ACCESS_KEY: rustfsadmin
-      RUSTFS_ENDPOINT_URL: http://rustfs:9000
-    volumes:
-      - media_tmp:/tmp/media_uploads
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-https://s3.twcstorage.ru}
+      S3_BUCKET: ${S3_BUCKET:-4c5face5-544c-4bc2-a2e0-57a24d243af3}
+      HLS_BUCKET: ${HLS_BUCKET:-4c5face5-544c-4bc2-a2e0-57a24d243af3}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+      S3_REGION: ${S3_REGION:-ru-1}
+      PODCAST_API_BASE_URL: ${PODCAST_API_BASE_URL:-}
+      PODCAST_API_BEARER_TOKEN: ${PODCAST_API_BEARER_TOKEN:-}
+      PODCAST_API_AUTHORIZATION: ${PODCAST_API_AUTHORIZATION:-}
+      SUBTITLE_LANGUAGE: ${SUBTITLE_LANGUAGE:-ru}
 
   media-subtitle-worker:
     build:
-      context: ../Media_subtitle_worker
+      context: ../Speech_service
       dockerfile: Dockerfile
     depends_on:
       kafka:
         condition: service_healthy
       kafka-init:
         condition: service_completed_successfully
-      rustfs:
-        condition: service_started
       media-worker:
         condition: service_started
     environment:
       KAFKA_BROKERS: kafka:9092
-      SUBTITLE_BUCKET: audio-hls
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL:-https://s3.twcstorage.ru}
+      S3_BUCKET: ${S3_BUCKET:-4c5face5-544c-4bc2-a2e0-57a24d243af3}
+      SUBTITLE_BUCKET: ${SUBTITLE_BUCKET:-4c5face5-544c-4bc2-a2e0-57a24d243af3}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
+      S3_REGION: ${S3_REGION:-ru-1}
       SUBTITLE_MAX_RETRIES: 3
       TRANSCRIBER_BACKEND: whisper-rs
       WHISPER_MODEL_PATH: ${WHISPER_MODEL_PATH:-/models/ggml-medium.bin}
@@ -116,20 +116,12 @@ services:
       PYANNOTE_ENABLED: "true"
       PYANNOTE_PYTHON_BIN: /opt/pyannote-venv/bin/python
       PYANNOTE_SCRIPT_PATH: /app/pyannote/diarize.py
-      PYANNOTE_HF_TOKEN: ${PYANNOTE_HF_TOKEN}
+      PYANNOTE_HF_TOKEN: ${PYANNOTE_HF_TOKEN:-}
       PYANNOTE_CHUNK_SECONDS: ${PYANNOTE_CHUNK_SECONDS:-60}
       PYANNOTE_CHUNK_OVERLAP_SECONDS: ${PYANNOTE_CHUNK_OVERLAP_SECONDS:-10}
       PYANNOTE_NUM_SPEAKERS: ${PYANNOTE_NUM_SPEAKERS:-}
       PYANNOTE_MIN_SPEAKERS: ${PYANNOTE_MIN_SPEAKERS:-}
       PYANNOTE_MAX_SPEAKERS: ${PYANNOTE_MAX_SPEAKERS:-}
       SPEAKER_CONTINUITY_MAX_GAP_MS: ${SPEAKER_CONTINUITY_MAX_GAP_MS:-1500}
-      RUSTFS_REGION: us-east-1
-      RUSTFS_ACCESS_KEY_ID: rustfsadmin
-      RUSTFS_SECRET_ACCESS_KEY: rustfsadmin
-      RUSTFS_ENDPOINT_URL: http://rustfs:9000
     volumes:
       - ../models:/models:ro
-
-volumes:
-  rustfs_data:
-  media_tmp:

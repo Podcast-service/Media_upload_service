@@ -2,7 +2,7 @@ use axum::{
     extract::FromRequestParts,
     http::{header, request::Parts, StatusCode},
 };
-use jsonwebtoken::{decode, DecodingKey, Validation, Algorithm};
+use jsonwebtoken::{decode, Algorithm, DecodingKey, Validation};
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
