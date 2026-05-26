@@ -1,8 +1,11 @@
 mod api_doc;
 mod auth;
 mod kafka;
+mod s3;
 mod upload;
 mod validation;
+
+use std::sync::Arc;
 
 use axum::{
     extract::DefaultBodyLimit,
@@ -24,17 +27,30 @@ async fn main() {
     let kafka_producer =
         kafka::new_producer(&kafka_brokers).expect("Failed to create Kafka producer");
 
+    let s3_cfg = s3::Config::from_env().expect("S3 config: set S3_* env variables");
+    let s3_client = Arc::new(
+        s3::create_client(&s3_cfg)
+            .await
+            .expect("Failed to create S3 client"),
+    );
+    let audio_bucket = std::env::var("AUDIO_BUCKET")
+        .ok()
+        .or_else(|| std::env::var("S3_BUCKET").ok())
+        .filter(|value| !value.trim().is_empty())
+        .expect("AUDIO_BUCKET or S3_BUCKET is required");
+    s3_client
+        .ensure_bucket(&audio_bucket)
+        .await
+        .expect("Failed to access audio bucket");
+
     let jwt_secret =
         std::env::var("JWT_SECRET").unwrap_or_else(|_| "super-secret-key-change-me".to_string());
 
-    let temp_dir =
-        std::env::var("TEMP_UPLOAD_DIR").unwrap_or_else(|_| "/tmp/media_uploads".to_string());
-    std::fs::create_dir_all(&temp_dir).expect("Failed to create temp upload directory");
-
     let state = upload::AppState {
         kafka: kafka_producer,
+        s3: s3_client,
         jwt_secret,
-        temp_dir,
+        audio_bucket,
     };
 
     let cors = CorsLayer::new()
@@ -44,7 +60,19 @@ async fn main() {
 
     let app = Router::new()
         .route("/api-docs/openapi.json", get(openapi_json))
-        .route("/api/media/upload", post(upload::upload_media))
+        .route("/api/media/upload_audio", post(upload::upload_audio))
+        .route(
+            "/api/media/upload_cover_profile",
+            post(upload::upload_cover_profile),
+        )
+        .route(
+            "/api/media/upload_cover_podcast",
+            post(upload::upload_cover_podcast),
+        )
+        .route(
+            "/api/media/upload_cover_playlist",
+            post(upload::upload_cover_playlist),
+        )
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .layer(cors)
         .with_state(state);

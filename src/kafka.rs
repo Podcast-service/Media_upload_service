@@ -6,28 +6,49 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use utoipa::ToSchema;
-use uuid::Uuid;
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, ToSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MediaObjectType {
+    PodcastFile,
+    Avatar,
+    PodcastCover,
+    Playlists,
+}
+
+impl MediaObjectType {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::PodcastFile => "podcast_file",
+            Self::Avatar => "avatar",
+            Self::PodcastCover => "podcast_cover",
+            Self::Playlists => "playlists",
+        }
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(tag = "event", rename_all = "snake_case")]
 pub enum MediaEvent {
     StartUpload {
-        file_id: String,
-        author_id: String,
-        filename: String,
+        #[serde(rename = "type")]
+        media_type: MediaObjectType,
+        object_id: String,
         started_at: DateTime<Utc>,
     },
     Uploaded {
-        file_id: String,
-        author_id: String,
-        size_bytes: usize,
-        original_format: String,
-        temp_path: String,
+        #[serde(rename = "type")]
+        media_type: MediaObjectType,
+        object_id: String,
+        url: String,
+        size: usize,
+        content_type: String,
         uploaded_at: DateTime<Utc>,
     },
     Error {
-        file_id: String,
-        stage: String,
+        #[serde(rename = "type")]
+        media_type: MediaObjectType,
+        object_id: String,
         error_message: String,
         timestamp: DateTime<Utc>,
     },
@@ -57,30 +78,22 @@ impl KafkaProducer {
 
     pub async fn send_start_upload(
         &self,
-        file_id: Uuid,
-        author_id: &str,
-        filename: &str,
+        media_type: MediaObjectType,
+        object_id: &str,
     ) -> Result<()> {
-        let file_id_key = file_id.to_string();
         let event = MediaEvent::StartUpload {
-            file_id: file_id_key.clone(),
-            author_id: author_id.to_string(),
-            filename: filename.to_string(),
+            media_type,
+            object_id: object_id.to_string(),
             started_at: Utc::now(),
         };
 
-        let payload = serde_json::to_string(&event)?;
-        let record = FutureRecord::to(TOPIC).key(&file_id_key).payload(&payload);
-
-        self.producer
-            .send(record, Duration::from_secs(30))
-            .await
-            .map_err(|(err, _msg)| anyhow::anyhow!("Failed to send media.start_upload: {}", err))?;
+        self.send_event(object_id, &event, "media.start_upload")
+            .await?;
 
         tracing::info!(
-            "Published media.start_upload (file_id={}, author_id={})",
-            file_id,
-            author_id,
+            "Published media.start_upload (type={}, object_id={})",
+            media_type.as_str(),
+            object_id,
         );
 
         Ok(())
@@ -88,60 +101,52 @@ impl KafkaProducer {
 
     pub async fn send_uploaded(
         &self,
-        file_id: Uuid,
-        author_id: &str,
-        size_bytes: usize,
-        original_format: &str,
-        temp_path: &str,
+        media_type: MediaObjectType,
+        object_id: &str,
+        url: &str,
+        size: usize,
+        content_type: &str,
     ) -> Result<()> {
-        let file_id_key = file_id.to_string();
         let event = MediaEvent::Uploaded {
-            file_id: file_id_key.clone(),
-            author_id: author_id.to_string(),
-            size_bytes,
-            original_format: original_format.to_string(),
-            temp_path: temp_path.to_string(),
+            media_type,
+            object_id: object_id.to_string(),
+            url: url.to_string(),
+            size,
+            content_type: content_type.to_string(),
             uploaded_at: Utc::now(),
         };
 
-        let payload = serde_json::to_string(&event)?;
-        let record = FutureRecord::to(TOPIC).key(&file_id_key).payload(&payload);
-
-        self.producer
-            .send(record, Duration::from_secs(30))
-            .await
-            .map_err(|(err, _msg)| anyhow::anyhow!("Failed to send media.uploaded: {}", err))?;
+        self.send_event(object_id, &event, "media.uploaded").await?;
 
         tracing::info!(
-            "Published media.uploaded (file_id={}, size={})",
-            file_id,
-            size_bytes,
+            "Published media.uploaded (type={}, object_id={}, size={})",
+            media_type.as_str(),
+            object_id,
+            size,
         );
 
         Ok(())
     }
 
-    pub async fn send_error(&self, file_id: Uuid, stage: &str, error_message: &str) -> Result<()> {
-        let file_id_key = file_id.to_string();
+    pub async fn send_error(
+        &self,
+        media_type: MediaObjectType,
+        object_id: &str,
+        error_message: &str,
+    ) -> Result<()> {
         let event = MediaEvent::Error {
-            file_id: file_id_key.clone(),
-            stage: stage.to_string(),
+            media_type,
+            object_id: object_id.to_string(),
             error_message: error_message.to_string(),
             timestamp: Utc::now(),
         };
 
-        let payload = serde_json::to_string(&event)?;
-        let record = FutureRecord::to(TOPIC).key(&file_id_key).payload(&payload);
-
-        self.producer
-            .send(record, Duration::from_secs(30))
-            .await
-            .map_err(|(err, _msg)| anyhow::anyhow!("Failed to send media.error: {}", err))?;
+        self.send_event(object_id, &event, "media.error").await?;
 
         tracing::info!(
-            "Published media.error (file_id={}, stage={})",
-            file_id,
-            stage,
+            "Published media.error (type={}, object_id={})",
+            media_type.as_str(),
+            object_id,
         );
 
         Ok(())
@@ -151,6 +156,18 @@ impl KafkaProducer {
         self.producer
             .flush(Duration::from_secs(10))
             .context("Failed to flush Kafka producer")?;
+        Ok(())
+    }
+
+    async fn send_event(&self, key: &str, event: &MediaEvent, label: &str) -> Result<()> {
+        let payload = serde_json::to_string(event)?;
+        let record = FutureRecord::to(TOPIC).key(key).payload(&payload);
+
+        self.producer
+            .send(record, Duration::from_secs(30))
+            .await
+            .map_err(|(err, _msg)| anyhow::anyhow!("Failed to send {label}: {err}"))?;
+
         Ok(())
     }
 }

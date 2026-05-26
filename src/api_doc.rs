@@ -1,8 +1,11 @@
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
-use crate::kafka::MediaEvent;
-use crate::upload::{UploadRequest, UploadResponse};
+use crate::kafka::{MediaEvent, MediaObjectType};
+use crate::upload::{
+    UploadAudioRequest, UploadPlaylistCoverRequest, UploadPodcastCoverRequest,
+    UploadProfileCoverRequest, UploadResponse,
+};
 
 struct SecurityAddon;
 
@@ -25,18 +28,25 @@ impl Modify for SecurityAddon {
 #[derive(OpenApi)]
 #[openapi(
     paths(
-        crate::upload::upload_media,
+        crate::upload::upload_audio,
+        crate::upload::upload_cover_profile,
+        crate::upload::upload_cover_podcast,
+        crate::upload::upload_cover_playlist,
     ),
     components(
         schemas(
-            UploadRequest,
+            UploadAudioRequest,
+            UploadProfileCoverRequest,
+            UploadPodcastCoverRequest,
+            UploadPlaylistCoverRequest,
             UploadResponse,
+            MediaObjectType,
             MediaEvent,
         )
     ),
     modifiers(&SecurityAddon),
     tags(
-        (name = "media", description = "Media upload API — загрузка аудиофайлов")
+        (name = "media", description = "Media upload API — загрузка аудио и изображений")
     )
 )]
 pub struct ApiDoc;
