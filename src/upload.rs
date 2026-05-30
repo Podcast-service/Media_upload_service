@@ -152,7 +152,7 @@ pub async fn upload_audio(
     request_body(
         content = UploadProfileCoverRequest,
         content_type = "multipart/form-data",
-        description = "Multipart form with image file. object_id is taken from JWT sub"
+        description = "Multipart form with image file. object_id is taken from JWT user_id"
     ),
     responses(
         (status = 200, description = "Upload accepted", body = UploadResponse),
@@ -349,7 +349,7 @@ async fn parse_upload(
 ) -> Result<ParsedUpload, (StatusCode, Json<UploadResponse>)> {
     let mut object_id = match config.object_id_source {
         ObjectIdSource::JwtSubject => {
-            let subject = validate_uuid_value(&auth.0.sub, "JWT sub")?;
+            let subject = validate_uuid_value(&auth.0.user_id, "JWT user_id")?;
             Some(subject)
         }
         ObjectIdSource::MultipartField(_) => None,
@@ -437,7 +437,7 @@ async fn parse_upload(
         None => {
             let field_name = match config.object_id_source {
                 ObjectIdSource::MultipartField(name) => name,
-                ObjectIdSource::JwtSubject => "JWT sub",
+                ObjectIdSource::JwtSubject => "JWT user_id",
             };
             return Err(error_response(
                 StatusCode::BAD_REQUEST,
