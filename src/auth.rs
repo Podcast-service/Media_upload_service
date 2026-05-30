@@ -10,8 +10,9 @@ use crate::upload::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct Claims {
-    /// Subject — user/author id
-    pub sub: String,
+    /// User/author id. Legacy tokens may use the standard JWT `sub` claim.
+    #[serde(alias = "sub")]
+    pub user_id: String,
     /// Expiration (unix timestamp)
     pub exp: usize,
     /// Issued at (unix timestamp)
@@ -60,5 +61,30 @@ impl FromRequestParts<AppState> for AuthUser {
         })?;
 
         Ok(AuthUser(token_data.claims))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Claims;
+
+    #[test]
+    fn deserializes_auth_service_user_id_claim() {
+        let claims: Claims = serde_json::from_str(
+            r#"{"user_id":"11111111-1111-4111-8111-111111111111","exp":1780150720}"#,
+        )
+        .unwrap();
+
+        assert_eq!(claims.user_id, "11111111-1111-4111-8111-111111111111");
+    }
+
+    #[test]
+    fn accepts_legacy_sub_claim() {
+        let claims: Claims = serde_json::from_str(
+            r#"{"sub":"11111111-1111-4111-8111-111111111111","exp":1780150720}"#,
+        )
+        .unwrap();
+
+        assert_eq!(claims.user_id, "11111111-1111-4111-8111-111111111111");
     }
 }

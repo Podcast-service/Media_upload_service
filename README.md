@@ -64,12 +64,12 @@ S3_SECRET_ACCESS_KEY=<secret>
 
 ## HTTP API
 
-Все upload-роуты требуют `Authorization: Bearer <JWT>`. Поля `id_podcast`, `id_playlist` и JWT `sub` должны быть UUID.
+Все upload-роуты требуют `Authorization: Bearer <JWT>`. Поля `id_podcast`, `id_playlist` и JWT `user_id` должны быть UUID. Для обратной совместимости также принимается JWT `sub`.
 
 | Route | Multipart fields | Kafka `type` | `object_id` |
 | --- | --- | --- | --- |
 | `POST /api/media/upload_audio` | `id_podcast`, `audio` | `podcast_file` | `id_podcast` |
-| `POST /api/media/upload_cover_profile` | `image` | `avatar` | JWT `sub` |
+| `POST /api/media/upload_cover_profile` | `image` | `avatar` | JWT `user_id` |
 | `POST /api/media/upload_cover_podcast` | `id_podcast`, `image` | `podcast_cover` | `id_podcast` |
 | `POST /api/media/upload_cover_playlist` | `id_playlist`, `image` | `playlists` | `id_playlist` |
 
@@ -149,7 +149,7 @@ curl -fsS http://localhost:8081/api-docs/openapi.json
 ### 2. Сгенерировать JWT
 
 ```bash
-TOKEN=$(python3 -c 'import base64, json, hmac, hashlib, time; enc=lambda o: base64.urlsafe_b64encode(json.dumps(o,separators=(",",":")).encode()).rstrip(b"=").decode(); header=enc({"alg":"HS256","typ":"JWT"}); payload=enc({"sub":"11111111-1111-4111-8111-111111111111","exp":int(time.time())+3600,"iat":int(time.time())}); sig=base64.urlsafe_b64encode(hmac.new(b"super-secret-key-change-me", f"{header}.{payload}".encode(), hashlib.sha256).digest()).rstrip(b"=").decode(); print(f"{header}.{payload}.{sig}")')
+TOKEN=$(python3 -c 'import base64, json, hmac, hashlib, time; enc=lambda o: base64.urlsafe_b64encode(json.dumps(o,separators=(",",":")).encode()).rstrip(b"=").decode(); header=enc({"alg":"HS256","typ":"JWT"}); payload=enc({"user_id":"11111111-1111-4111-8111-111111111111","exp":int(time.time())+3600,"iat":int(time.time())}); sig=base64.urlsafe_b64encode(hmac.new(b"super-secret-key-change-me", f"{header}.{payload}".encode(), hashlib.sha256).digest()).rstrip(b"=").decode(); print(f"{header}.{payload}.{sig}")')
 ```
 
 ### 3. Отправить аудио
