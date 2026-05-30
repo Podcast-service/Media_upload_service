@@ -44,7 +44,7 @@ async fn main() {
         .expect("Failed to access audio bucket");
 
     let jwt_secret =
-        std::env::var("JWT_SECRET").unwrap_or_else(|_| "super-secret-key-change-me".to_string());
+        std::env::var("ACCESS_TOKEN_SECRET").unwrap_or_else(|_| "super-secret-key-change-me".to_string());
 
     let state = upload::AppState {
         kafka: kafka_producer,
