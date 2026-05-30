@@ -46,6 +46,7 @@ async fn main() {
     let jwt_secret = std::env::var("JWT_SECRET")
         .or_else(|_| std::env::var("ACCESS_TOKEN_SECRET"))
         .unwrap_or_else(|_| "super-secret-key-change-me".to_string());
+    info!("Using JWT secret: {}", jwt_secret);
 
     let state = upload::AppState {
         kafka: kafka_producer,
