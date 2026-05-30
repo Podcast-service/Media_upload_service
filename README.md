@@ -98,6 +98,7 @@ S3_SECRET_ACCESS_KEY=<secret>
 ## Kafka Contract
 
 API публикует события в topic `media`. Все события имеют поля `event`, `type` и `object_id`.
+Эти сообщения сохраняются для коммуникации с `Media_worker`.
 
 Начало загрузки:
 
@@ -137,6 +138,21 @@ API публикует события в topic `media`. Все события и
 ```
 
 `Media_worker` обрабатывает только `event=uploaded` + `type=podcast_file`. Cover/avatar-события остаются в topic `media` для backend-потребителей и игнорируются worker'ом.
+
+Для backend API дополнительно публикует совместимые события в topic `media.upload`.
+Для аудиофайла используются `object_type=podcast_file_url` и `audio_url_file`:
+
+```json
+{
+  "object_type": "podcast_file_url",
+  "object_id": "11111111-1111-1111-1111-111111111111",
+  "event": "uploaded",
+  "audio_url_file": "s3://bucket/media/uploads/podcast_file/11111111-1111-1111-1111-111111111111/source.mp3",
+  "timestamp": "2026-05-31T00:00:00Z"
+}
+```
+
+Для обложек и аватаров вместо `audio_url_file` публикуется `image_url`.
 
 ## Проверка работоспособности
 
