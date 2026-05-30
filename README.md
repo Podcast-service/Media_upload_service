@@ -1,7 +1,7 @@
 # Media API
 
 Сервис принимает `multipart/form-data`, проверяет аудио или изображение по расширению и magic bytes, загружает файл в S3-compatible storage и публикует generic-события в Kafka topic `media`.
-
+.
 ## Интеграционный запуск с S3
 
 `docker-compose.yml` в этой директории прокидывает в downstream worker'ы внешний S3-compatible storage:
