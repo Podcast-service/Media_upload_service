@@ -38,6 +38,7 @@ services:
           sleep 2;
         done;
         kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic media --partitions 1 --replication-factor 1;
+        kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic media.upload --partitions 1 --replication-factor 1;
         kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic media.worker --partitions 1 --replication-factor 1;
         kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic media.subtitle --partitions 1 --replication-factor 1;
         kafka-topics --bootstrap-server kafka:9092 --list;
