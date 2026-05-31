@@ -22,6 +22,7 @@ const MIN_MAGIC_BYTES: usize = 12;
 pub struct AppState {
     pub kafka: SharedKafkaProducer,
     pub s3: Arc<S3Client>,
+    pub s3_endpoint_url: String,
     pub jwt_secret: String,
     pub audio_bucket: String,
 }
@@ -309,14 +310,17 @@ async fn handle_upload(
         return error_response(StatusCode::INTERNAL_SERVER_ERROR, msg);
     }
 
-    let url = s3::s3_url(&state.audio_bucket, &object_key);
+    // The worker downloads through the S3 SDK, while backend clients need an HTTP URL.
+    let s3_url = s3::s3_url(&state.audio_bucket, &object_key);
+    let public_url = s3::public_url(&state.s3_endpoint_url, &state.audio_bucket, &object_key);
 
     if let Err(e) = state
         .kafka
         .send_uploaded(
             config.media_type,
             &parsed.object_id,
-            &url,
+            &s3_url,
+            &public_url,
             parsed.file.size,
             &parsed.file.content_type,
         )
@@ -331,7 +335,7 @@ async fn handle_upload(
             success: true,
             media_type: Some(config.media_type.as_str().to_string()),
             object_id: Some(parsed.object_id),
-            url: Some(url),
+            url: Some(public_url),
             size: Some(parsed.file.size),
             content_type: Some(parsed.file.content_type),
             filename: Some(parsed.file.filename),

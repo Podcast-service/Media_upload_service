@@ -150,6 +150,15 @@ pub fn s3_url(bucket: &str, object_key: &str) -> String {
     format!("s3://{}/{}", bucket, object_key)
 }
 
+pub fn public_url(endpoint_url: &str, bucket: &str, object_key: &str) -> String {
+    format!(
+        "{}/{}/{}",
+        endpoint_url.trim_end_matches('/'),
+        bucket,
+        object_key
+    )
+}
+
 fn env_value(name: &str) -> Option<String> {
     env::var(name)
         .ok()
@@ -161,4 +170,21 @@ fn should_create_bucket() -> bool {
     env::var("S3_CREATE_BUCKET")
         .map(|value| value.eq_ignore_ascii_case("true") || value == "1")
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::public_url;
+
+    #[test]
+    fn public_url_uses_endpoint_without_duplicate_separator() {
+        assert_eq!(
+            public_url(
+                "https://s3.twcstorage.ru/",
+                "bucket",
+                "media/uploads/avatar/file.jpeg"
+            ),
+            "https://s3.twcstorage.ru/bucket/media/uploads/avatar/file.jpeg"
+        );
+    }
 }

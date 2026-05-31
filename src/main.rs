@@ -51,6 +51,7 @@ async fn main() {
     let state = upload::AppState {
         kafka: kafka_producer,
         s3: s3_client,
+        s3_endpoint_url: s3_cfg.endpoint_url,
         jwt_secret,
         audio_bucket,
     };

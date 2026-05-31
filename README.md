@@ -87,7 +87,7 @@ S3_SECRET_ACCESS_KEY=<secret>
   "success": true,
   "type": "podcast_file",
   "object_id": "11111111-1111-1111-1111-111111111111",
-  "url": "s3://4c5face5-544c-4bc2-a2e0-57a24d243af3/media/uploads/podcast_file/11111111-1111-1111-1111-111111111111/<upload-id>.mp3",
+  "url": "https://s3.twcstorage.ru/4c5face5-544c-4bc2-a2e0-57a24d243af3/media/uploads/podcast_file/11111111-1111-1111-1111-111111111111/<upload-id>.mp3",
   "size": 123456,
   "content_type": "audio/mpeg",
   "filename": "episode.mp3",
@@ -140,6 +140,7 @@ API публикует события в topic `media`. Все события и
 `Media_worker` обрабатывает только `event=uploaded` + `type=podcast_file`. Cover/avatar-события остаются в topic `media` для backend-потребителей и игнорируются worker'ом.
 
 Для backend API дополнительно публикует совместимые события в topic `media.upload`.
+URL в этих событиях доступен по HTTP и строится из `S3_ENDPOINT_URL`.
 Для аудиофайла используются `object_type=podcast_file_url` и `audio_url_file`:
 
 ```json
@@ -147,7 +148,7 @@ API публикует события в topic `media`. Все события и
   "object_type": "podcast_file_url",
   "object_id": "11111111-1111-1111-1111-111111111111",
   "event": "uploaded",
-  "audio_url_file": "s3://bucket/media/uploads/podcast_file/11111111-1111-1111-1111-111111111111/source.mp3",
+  "audio_url_file": "https://s3.twcstorage.ru/bucket/media/uploads/podcast_file/11111111-1111-1111-1111-111111111111/source.mp3",
   "timestamp": "2026-05-31T00:00:00Z"
 }
 ```
