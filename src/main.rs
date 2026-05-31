@@ -2,6 +2,7 @@ mod api_doc;
 mod auth;
 mod kafka;
 mod s3;
+mod telemetry;
 mod upload;
 mod validation;
 
@@ -13,14 +14,15 @@ use axum::{
     Json, Router,
 };
 use tower_http::cors::{Any, CorsLayer};
-use tracing::info;
+use tower_http::trace::{DefaultMakeSpan, TraceLayer};
+use tracing::{info, Level};
 use utoipa::OpenApi;
 
 use api_doc::ApiDoc;
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    let _telemetry = telemetry::init("media_upload_service");
 
     let kafka_brokers =
         std::env::var("KAFKA_BROKERS").unwrap_or_else(|_| "localhost:9092".to_string());
@@ -77,6 +79,10 @@ async fn main() {
         )
         .layer(DefaultBodyLimit::max(50 * 1024 * 1024))
         .layer(cors)
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO)),
+        )
         .with_state(state);
 
     let port = std::env::var("PORT").unwrap_or_else(|_| "8081".to_string());
