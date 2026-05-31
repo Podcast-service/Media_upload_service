@@ -64,6 +64,12 @@ services:
       S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID:?set S3_ACCESS_KEY_ID}
       S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY:?set S3_SECRET_ACCESS_KEY}
       S3_REGION: ${S3_REGION:-ru-1}
+      OTEL_SERVICE_NAME: media_upload_service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:-dev}
+    networks:
+      - default
+      - otel
 
   media-worker:
     build:
@@ -89,6 +95,12 @@ services:
       PODCAST_API_BEARER_TOKEN: ${PODCAST_API_BEARER_TOKEN:-}
       PODCAST_API_AUTHORIZATION: ${PODCAST_API_AUTHORIZATION:-}
       SUBTITLE_LANGUAGE: ${SUBTITLE_LANGUAGE:-ru}
+      OTEL_SERVICE_NAME: media_worker
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:-dev}
+    networks:
+      - default
+      - otel
 
   media-subtitle-worker:
     build:
@@ -124,5 +136,16 @@ services:
       PYANNOTE_MIN_SPEAKERS: ${PYANNOTE_MIN_SPEAKERS:-}
       PYANNOTE_MAX_SPEAKERS: ${PYANNOTE_MAX_SPEAKERS:-}
       SPEAKER_CONTINUITY_MAX_GAP_MS: ${SPEAKER_CONTINUITY_MAX_GAP_MS:-1500}
+      OTEL_SERVICE_NAME: speech_service
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://otel-collector:4317}
+      DEPLOYMENT_ENV: ${DEPLOYMENT_ENV:-dev}
+    networks:
+      - default
+      - otel
     volumes:
       - ../models:/models:ro
+
+networks:
+  otel:
+    external: true
+    name: ot_collector_otel
