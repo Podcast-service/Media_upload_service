@@ -197,7 +197,8 @@ impl KafkaProducer {
         &self,
         media_type: MediaObjectType,
         object_id: &str,
-        url: &str,
+        s3_url: &str,
+        public_url: &str,
         size: usize,
         content_type: &str,
     ) -> Result<()> {
@@ -205,13 +206,13 @@ impl KafkaProducer {
         let event = MediaEvent::Uploaded {
             media_type,
             object_id: object_id.to_string(),
-            url: url.to_string(),
+            url: s3_url.to_string(),
             size,
             content_type: content_type.to_string(),
             uploaded_at: timestamp,
         };
         let backend_event =
-            BackendMediaUploadEvent::uploaded(media_type, object_id, url, timestamp);
+            BackendMediaUploadEvent::uploaded(media_type, object_id, public_url, timestamp);
 
         let media_result = self
             .send_event(TOPIC_MEDIA, object_id, &event, "media.uploaded")
@@ -318,13 +319,16 @@ mod tests {
         let event = BackendMediaUploadEvent::uploaded(
             MediaObjectType::PodcastFile,
             "11111111-1111-4111-8111-111111111111",
-            "s3://bucket/source.mp3",
+            "https://s3.twcstorage.ru/bucket/source.mp3",
             Utc::now(),
         );
         let value = serde_json::to_value(event).unwrap();
 
         assert_eq!(value["object_type"], "podcast_file_url");
-        assert_eq!(value["audio_url_file"], "s3://bucket/source.mp3");
+        assert_eq!(
+            value["audio_url_file"],
+            "https://s3.twcstorage.ru/bucket/source.mp3"
+        );
         assert!(value.get("image_url").is_none());
     }
 
@@ -333,13 +337,16 @@ mod tests {
         let event = BackendMediaUploadEvent::uploaded(
             MediaObjectType::PodcastCover,
             "11111111-1111-4111-8111-111111111111",
-            "s3://bucket/cover.webp",
+            "https://s3.twcstorage.ru/bucket/cover.webp",
             Utc::now(),
         );
         let value = serde_json::to_value(event).unwrap();
 
         assert_eq!(value["object_type"], "podcast_cover_url");
-        assert_eq!(value["image_url"], "s3://bucket/cover.webp");
+        assert_eq!(
+            value["image_url"],
+            "https://s3.twcstorage.ru/bucket/cover.webp"
+        );
         assert!(value.get("audio_url_file").is_none());
     }
 }
