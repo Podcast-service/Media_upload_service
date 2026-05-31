@@ -52,6 +52,7 @@ pub enum MediaEvent {
         url: String,
         size: usize,
         content_type: String,
+        need_subtitle: bool,
         uploaded_at: DateTime<Utc>,
     },
     Error {
@@ -203,14 +204,8 @@ impl KafkaProducer {
         content_type: &str,
     ) -> Result<()> {
         let timestamp = Utc::now();
-        let event = MediaEvent::Uploaded {
-            media_type,
-            object_id: object_id.to_string(),
-            url: s3_url.to_string(),
-            size,
-            content_type: content_type.to_string(),
-            uploaded_at: timestamp,
-        };
+        let event =
+            media_uploaded_event(media_type, object_id, s3_url, size, content_type, timestamp);
         let backend_event =
             BackendMediaUploadEvent::uploaded(media_type, object_id, public_url, timestamp);
 
@@ -303,6 +298,25 @@ impl KafkaProducer {
     }
 }
 
+fn media_uploaded_event(
+    media_type: MediaObjectType,
+    object_id: &str,
+    s3_url: &str,
+    size: usize,
+    content_type: &str,
+    timestamp: DateTime<Utc>,
+) -> MediaEvent {
+    MediaEvent::Uploaded {
+        media_type,
+        object_id: object_id.to_string(),
+        url: s3_url.to_string(),
+        size,
+        content_type: content_type.to_string(),
+        need_subtitle: true,
+        uploaded_at: timestamp,
+    }
+}
+
 pub type SharedKafkaProducer = Arc<KafkaProducer>;
 
 pub fn new_producer(brokers: &str) -> Result<SharedKafkaProducer> {
@@ -313,6 +327,21 @@ pub fn new_producer(brokers: &str) -> Result<SharedKafkaProducer> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn public_uploaded_event_enables_subtitles_by_default() {
+        let event = media_uploaded_event(
+            MediaObjectType::PodcastFile,
+            "11111111-1111-4111-8111-111111111111",
+            "s3://bucket/source.mp3",
+            123,
+            "audio/mpeg",
+            Utc::now(),
+        );
+        let value = serde_json::to_value(event).unwrap();
+
+        assert_eq!(value["need_subtitle"], true);
+    }
 
     #[test]
     fn backend_podcast_upload_uses_audio_url_file() {
