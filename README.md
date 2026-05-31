@@ -1,7 +1,7 @@
 # Media API
 
-Сервис принимает `multipart/form-data`, проверяет аудио или изображение по расширению и magic bytes, загружает файл в S3-compatible storage и публикует generic-события в Kafka topic `media`.
-.
+Сервис принимает `multipart/form-data`, проверяет аудио или изображение по расширению и magic bytes, загружает файл в S3-compatible storage и публикует события в Kafka.
+
 ## Интеграционный запуск с S3
 
 `docker-compose.yml` в этой директории прокидывает в downstream worker'ы внешний S3-compatible storage:
@@ -97,63 +97,12 @@ S3_SECRET_ACCESS_KEY=<secret>
 
 ## Kafka Contract
 
-API публикует события в topic `media`. Все события имеют поля `event`, `type` и `object_id`.
-Эти сообщения сохраняются для коммуникации с `Media_worker`.
+Сервис не читает Kafka-сообщения и публикует два потока:
 
-Начало загрузки:
+- `media` — generic-события для `Media_worker`;
+- `media.upload` — backend-события для `podcast_core`.
 
-```json
-{
-  "event": "start_upload",
-  "type": "podcast_file",
-  "object_id": "11111111-1111-1111-1111-111111111111",
-  "started_at": "2026-03-22T12:34:00Z"
-}
-```
-
-Успешная загрузка:
-
-```json
-{
-  "event": "uploaded",
-  "type": "podcast_cover",
-  "object_id": "22222222-2222-4222-8222-222222222222",
-  "url": "s3://4c5face5-544c-4bc2-a2e0-57a24d243af3/media/uploads/podcast_cover/22222222-2222-4222-8222-222222222222/<upload-id>.webp",
-  "size": 123456,
-  "content_type": "image/webp",
-  "uploaded_at": "2026-03-22T12:34:10Z"
-}
-```
-
-Ошибка:
-
-```json
-{
-  "event": "error",
-  "type": "avatar",
-  "object_id": "33333333-3333-4333-8333-333333333333",
-  "error_message": "Unsupported media type",
-  "timestamp": "2026-03-22T12:34:10Z"
-}
-```
-
-`Media_worker` обрабатывает только `event=uploaded` + `type=podcast_file`. Cover/avatar-события остаются в topic `media` для backend-потребителей и игнорируются worker'ом.
-
-Для backend API дополнительно публикует совместимые события в topic `media.upload`.
-URL в этих событиях доступен по HTTP и строится из `S3_ENDPOINT_URL`.
-Для аудиофайла используются `object_type=podcast_file_url` и `audio_url_file`:
-
-```json
-{
-  "object_type": "podcast_file_url",
-  "object_id": "11111111-1111-1111-1111-111111111111",
-  "event": "uploaded",
-  "audio_url_file": "https://s3.twcstorage.ru/bucket/media/uploads/podcast_file/11111111-1111-1111-1111-111111111111/source.mp3",
-  "timestamp": "2026-05-31T00:00:00Z"
-}
-```
-
-Для обложек и аватаров вместо `audio_url_file` публикуется `image_url`.
+Полные JSON-контракты: [`docs/kafka-contract.md`](docs/kafka-contract.md).
 
 ## Проверка работоспособности
 
